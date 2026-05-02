@@ -2,66 +2,52 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>我的工具集 - 自动检测</title>
-    <style>
-        body { font-family: system-ui; background: #0e0e10; color: #eee; padding: 30px; }
-        a { color: #fb7299; text-decoration: none; display: block; padding: 8px 0; }
-        a:hover { text-decoration: underline; }
-        .container { max-width: 600px; margin: 0 auto; }
-        input { width: 100%; padding: 8px; margin: 10px 0; background: #1c1c22; border: 1px solid #333; color: #fff; border-radius: 8px; }
-    </style>
+    <title>文件列表</title>
 </head>
 <body>
-<div class="container">
-    <h2>📁 我的 BiliTools</h2>
-    <p>自动扫描 <code>husky1919.github.io</code> 根目录下的 .html 文件</p>
-    <input type="text" id="filter" placeholder="🔍 筛选..." onkeyup="filterList()">
-    <div id="fileList">⏳ 正在扫描...</div>
-</div>
+    <input type="text" id="filter" placeholder="筛选" onkeyup="filterList()">
+    <div id="fileList">正在扫描...</div>
 
-<script>
-    const REPO_OWNER = "husky1919";
-    const REPO_NAME = "husky1919.github.io";
-    const BRANCH = "main";  // 如果用 master 就改成 master
+    <script>
+        const REPO_OWNER = "husky1919";
+        const REPO_NAME = "husky1919.github.io";
+        const BRANCH = "main";
 
-    async function fetchHtmlFiles() {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            const htmlFiles = data.tree.filter(item => 
-                item.path.endsWith('.html') && item.path !== 'index.html'
-            );
-            displayList(htmlFiles.map(f => f.path));
-        } catch (err) {
-            document.getElementById('fileList').innerHTML = `❌ 获取失败: ${err.message}<br>可能需要手动添加 ?nocache 或检查仓库名`;
-        }
-    }
-
-    function displayList(files) {
-        const container = document.getElementById('fileList');
-        if (files.length === 0) {
-            container.innerHTML = '📭 没有找到其他 .html 文件';
-            return;
-        }
-        container.innerHTML = files.map(file => `
-            <a href="${file}" target="_blank">📄 ${file}</a>
-        `).join('');
-    }
-
-    function filterList() {
-        const keyword = document.getElementById('filter').value.toLowerCase();
-        const links = document.querySelectorAll('#fileList a');
-        links.forEach(link => {
-            if (link.textContent.toLowerCase().includes(keyword)) {
-                link.style.display = 'block';
-            } else {
-                link.style.display = 'none';
+        async function fetchHtmlFiles() {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const htmlFiles = data.tree.filter(item => item.path.endsWith('.html') && item.path !== 'index.html');
+                displayList(htmlFiles.map(f => f.path));
+            } catch (err) {
+                document.getElementById('fileList').innerHTML = '获取失败：' + err.message;
             }
-        });
-    }
+        }
 
-    fetchHtmlFiles();
-</script>
+        function displayList(files) {
+            const container = document.getElementById('fileList');
+            if (files.length === 0) {
+                container.innerHTML = '没有找到其他 .html 文件';
+                return;
+            }
+            container.innerHTML = files.map(file => '<a href="' + file + '" target="_blank">' + file + '</a><br>').join('');
+        }
+
+        function filterList() {
+            const keyword = document.getElementById('filter').value.toLowerCase();
+            const links = document.querySelectorAll('#fileList a');
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                if (link.textContent.toLowerCase().indexOf(keyword) !== -1) {
+                    link.style.display = '';
+                } else {
+                    link.style.display = 'none';
+                }
+            }
+        }
+
+        fetchHtmlFiles();
+    </script>
 </body>
 </html>
