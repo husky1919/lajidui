@@ -14,19 +14,17 @@
         const REPO_NAME = "husky1919.github.io";
         const BRANCH = "main";
 
-        async function fetchHtmlFiles() {
+        async function fetchAllFiles() {
             const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                // 过滤：只要.html文件，排除index.html，排除biliplus开头的文件
-                const htmlFiles = data.tree.filter(item => {
-                    const fileName = item.path.split('/').pop(); // 获取文件名部分
-                    return item.path.endsWith('.html') && 
-                           item.path !== 'index.html' &&
-                           !fileName.startsWith('biliplus');
+                // 排除 biliplus 开头的文件（保留所有其他文件，不限制后缀）
+                const allFiles = data.tree.filter(item => {
+                    const fileName = item.path.split('/').pop();
+                    return item.path !== 'index.html' && !fileName.startsWith('biliplus');
                 });
-                displayList(htmlFiles.map(f => f.path));
+                displayList(allFiles.map(f => f.path));
             } catch (err) {
                 document.getElementById('fileList').innerHTML = '获取失败：' + err.message;
             }
@@ -35,7 +33,7 @@
         function displayList(files) {
             const container = document.getElementById('fileList');
             if (files.length === 0) {
-                container.innerHTML = '没有找到其他 .html 文件';
+                container.innerHTML = '没有找到其他文件';
                 return;
             }
             container.innerHTML = files.map(file => '<a href="' + file + '" target="_blank">' + file + '</a><br>').join('');
@@ -54,7 +52,7 @@
             }
         }
 
-        fetchHtmlFiles();
+        fetchAllFiles();
     </script>
 </body>
 </html>
