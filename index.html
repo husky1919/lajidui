@@ -2,124 +2,124 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>文件列表</title>
+    <title>文件浏览器</title>
 </head>
 <body>
     <p>说明：JS和WASM目录下的是MC移植网页版，biliplus开头的不用理</p>
     <div>
-        <button onclick="goBack()" id="backBtn" style="display:none;">⬅ 返回上级</button>
-        <span id="currentPath" style="margin-left: 10px;">当前位置：/</span>
+        <button id="backBtn" style="display:none;" onclick="goBack()">⬅ 返回上级</button>
+        <span id="currentPath">当前位置：/</span>
     </div>
     <input type="text" id="filter" placeholder="筛选" onkeyup="filterList()">
-    <div id="fileList">正在扫描...</div>
+    <div id="fileList">正在加载…</div>
 
     <script>
+        // 配置
         const REPO_OWNER = "husky1919";
         const REPO_NAME = "husky1919.github.io";
         const BRANCH = "main";
 
-        let allItems = [];
-        let currentPath = "";
-        let currentItems = [];
+        // 全局数据
+        let allItems = [];        // 所有文件和目录的完整路径列表
+        let currentPath = "";     // 当前浏览的目录路径（相对于仓库根目录，空字符串表示根）
+        let currentEntries = [];   // 当前目录下的直接子项（文件夹+文件）
 
+        // 获取仓库所有文件/目录的原始数据（递归树）
         async function fetchAllItems() {
-            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
+            const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
             try {
-                const res = await fetch(url);
+                const res = await fetch(apiUrl);
                 const data = await res.json();
+                // 过滤掉 index.html 和 biliplus 开头的文件（不显示）
                 allItems = data.tree.filter(item => {
                     const fileName = item.path.split('/').pop();
                     return item.path !== 'index.html' && !fileName.startsWith('biliplus');
                 });
+                // 开始浏览根目录
                 navigateTo("");
             } catch (err) {
-                document.getElementById('fileList').innerHTML = '获取失败：' + err.message;
+                document.getElementById('fileList').innerHTML = `加载失败：${err.message}`;
             }
         }
 
+        // 导航到指定目录（纯前端更新，不跳转页面）
         function navigateTo(path) {
             currentPath = path;
-            document.getElementById('currentPath').innerHTML = '当前位置：/' + (currentPath || '');
+            // 更新界面上的路径显示
+            const pathDisplay = currentPath === "" ? "/" : "/" + currentPath + "/";
+            document.getElementById('currentPath').innerText = "当前位置：" + pathDisplay;
+            // 控制返回按钮的显示
             document.getElementById('backBtn').style.display = currentPath === "" ? "none" : "inline-block";
-            
-            const children = [];
-            const subDirs = new Set();
-            
+
+            // 找出当前目录下的直接子项（文件夹和文件）
+            const entries = new Map();  // 用 Map 避免重复添加相同名称的文件夹
+
             for (const item of allItems) {
-                const itemPath = item.path;
+                const fullPath = item.path;
+                // 如果不是在当前目录下，跳过
                 if (currentPath !== "") {
-                    if (!itemPath.startsWith(currentPath + "/")) continue;
+                    if (!fullPath.startsWith(currentPath + "/")) continue;
                 }
-                
-                const relativePath = currentPath === "" ? itemPath : itemPath.substring(currentPath.length + 1);
-                
+
+                // 获取相对路径（相对于当前目录）
+                let relativePath;
+                if (currentPath === "") {
+                    relativePath = fullPath;
+                } else {
+                    relativePath = fullPath.substring(currentPath.length + 1);
+                }
+
+                // 如果还有斜杠，说明是子目录中的内容，只取第一段作为目录名
                 if (relativePath.includes("/")) {
                     const dirName = relativePath.split("/")[0];
-                    if (!subDirs.has(dirName)) {
-                        subDirs.add(dirName);
-                        children.push({
-                            type: "dir",
-                            name: dirName,
-                            path: currentPath === "" ? dirName : currentPath + "/" + dirName
-                        });
+                    if (!entries.has(dirName)) {
+                        entries.set(dirName, { type: "dir", name: dirName, fullPath: currentPath === "" ? dirName : currentPath + "/" + dirName });
                     }
                 } else {
-                    children.push({
-                        type: "file",
-                        name: relativePath,
-                        path: itemPath
-                    });
+                    // 当前目录下的文件
+                    entries.set(relativePath, { type: "file", name: relativePath, fullPath: fullPath });
                 }
             }
-            
-            const uniqueChildren = [];
-            const seenNames = new Set();
-            for (const child of children) {
-                if (!seenNames.has(child.name)) {
-                    seenNames.add(child.name);
-                    uniqueChildren.push(child);
-                }
-            }
-            
-            uniqueChildren.sort((a, b) => {
+
+            // 转为数组并排序：文件夹在前，文件在后，按名称排序
+            let entryList = Array.from(entries.values());
+            entryList.sort((a, b) => {
                 if (a.type !== b.type) {
                     return a.type === "dir" ? -1 : 1;
                 }
                 return a.name.localeCompare(b.name);
             });
-            
-            currentItems = uniqueChildren;
-            displayList();
+
+            currentEntries = entryList;
+            renderFileList();
         }
 
-        function displayList() {
+        // 渲染当前目录下的文件和文件夹
+        function renderFileList() {
             const container = document.getElementById('fileList');
-            if (currentItems.length === 0) {
-                container.innerHTML = '此文件夹为空';
+            if (currentEntries.length === 0) {
+                container.innerHTML = "📭 此文件夹为空";
                 return;
             }
-            
-            let html = '';
-            for (let i = 0; i < currentItems.length; i++) {
-                const item = currentItems[i];
-                if (item.type === "dir") {
-                    html += '<div><span style="cursor:pointer;color:blue;text-decoration:underline;" onclick="enterDir(\'' + item.path.replace(/'/g, "\\'") + '\')">📁 ' + item.name + '</span></div>';
+
+            let html = "";
+            for (const entry of currentEntries) {
+                if (entry.type === "dir") {
+                    // 文件夹：使用 span 绑定点击事件，绝对不产生跳转
+                    html += `<div><span style="cursor:pointer;color:#0000EE;text-decoration:underline;" onclick="navigateTo('${escapePath(entry.fullPath)}')">📁 ${entry.name}</span></div>`;
                 } else {
-                    html += '<div><a href="' + item.path + '" target="_blank">📄 ' + item.name + '</a></div>';
+                    // 文件：用正常的超链接，在新标签页打开（符合预期）
+                    html += `<div><a href="${entry.fullPath}" target="_blank">📄 ${entry.name}</a></div>`;
                 }
             }
             container.innerHTML = html;
-            
-            const keyword = document.getElementById('filter').value.toLowerCase();
-            if (keyword) {
-                applyFilter(keyword);
-            }
+
+            // 如果存在筛选关键词，重新应用筛选
+            const keyword = document.getElementById('filter').value.trim().toLowerCase();
+            if (keyword) applyFilter(keyword);
         }
 
-        function enterDir(path) {
-            navigateTo(path);
-        }
-
+        // 返回上级目录
         function goBack() {
             if (currentPath === "") return;
             const lastSlash = currentPath.lastIndexOf("/");
@@ -127,29 +127,36 @@
             navigateTo(parentPath);
         }
 
+        // 辅助函数：转义路径中的单引号，避免 onclick 语法错误
+        function escapePath(path) {
+            return path.replace(/'/g, "\\'");
+        }
+
+        // 筛选功能（基于当前渲染的 DOM 元素）
         function filterList() {
-            const keyword = document.getElementById('filter').value.toLowerCase();
+            const keyword = document.getElementById('filter').value.trim().toLowerCase();
             applyFilter(keyword);
         }
 
         function applyFilter(keyword) {
-            const containers = document.querySelectorAll('#fileList > div');
-            if (!keyword) {
-                for (let i = 0; i < containers.length; i++) {
-                    containers[i].style.display = '';
+            const items = document.querySelectorAll('#fileList > div');
+            if (keyword === "") {
+                for (let i = 0; i < items.length; i++) {
+                    items[i].style.display = "";
                 }
                 return;
             }
-            for (let i = 0; i < containers.length; i++) {
-                const text = containers[i].innerText.toLowerCase();
-                if (text.indexOf(keyword) !== -1) {
-                    containers[i].style.display = '';
+            for (let i = 0; i < items.length; i++) {
+                const text = items[i].innerText.toLowerCase();
+                if (text.includes(keyword)) {
+                    items[i].style.display = "";
                 } else {
-                    containers[i].style.display = 'none';
+                    items[i].style.display = "none";
                 }
             }
         }
 
+        // 启动
         fetchAllItems();
     </script>
 </body>
