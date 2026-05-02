@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiliPlus API 调试工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background: #0e0e10;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #eef2ff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.7rem;
+            margin: 0 0 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .badge {
+            background: #fb7299;
+            color: white;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-weight: normal;
+        }
+        .sub {
+            color: #8a8aa6;
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+            border-left: 3px solid #fb7299;
+            padding-left: 12px;
+        }
+        .key-warning {
+            background: #2a1e2c;
+            border-left: 4px solid #f97316;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+            color: #ffc49b;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #1c1c22;
+            border-radius: 24px;
+            padding: 18px 20px;
+            flex: 1;
+            min-width: 260px;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            border: 1px solid #2c2c34;
+        }
+        .card h3 {
+            margin: 0 0 12px 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        label {
+            font-size: 0.8rem;
+            color: #b9b9d6;
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 6px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0a0a0e;
+            border: 1px solid #333344;
+            border-radius: 20px;
+            color: #f0f0ff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: 0.2s;
+        }
+        input:focus {
+            border-color: #fb7299;
+        }
+        button {
+            margin-top: 18px;
+            background: #fb7299;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 40px;
+            font-weight: bold;
+            color: #0e0e10;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.2s;
+            width: 100%;
+        }
+        button:hover {
+            background: #ff8aad;
+            transform: scale(0.97);
+        }
+        .output-area {
+            background: #0f0f13;
+            border-radius: 24px;
+            border: 1px solid #2d2d38;
+            padding: 16px 20px;
+            margin-top: 16px;
+        }
+        pre {
+            background: #09090c;
+            padding: 16px;
+            border-radius: 20px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            color: #cbd5ff;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .inline-code {
+            background: #2c2c34;
+            padding: 2px 8px;
+            border-radius: 30px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        hr {
+            border-color: #2c2c34;
+            margin: 20px 0;
+        }
+        .status-ok {
+            color: #6feb8c;
+        }
+        .status-err {
+            color: #ff8a7a;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>
+        🧪 BiliPlus API 调试台 
+        <span class="badge">第三方接口 · 仅本地测试</span>
+    </h1>
+    <div class="sub">
+        📡 支持视频信息、播放地址解析、批量查询 | 🔑 access_key 已内置 (本页面仅用于你个人测试)
+    </div>
+    <div class="key-warning">
+        🔐 <strong>当前 access_key：</strong> 78bd6ce6df11dc14c35b476bb9874031<br>
+        ⚠️ 该密钥属于你的B站账号，请勿外泄！用完请到B站【设置】→【安全退出】→修改密码，使旧key失效。
+    </div>
+
+    <div class="flex-row">
+        <!-- 卡片1: 单视频信息 -->
+        <div class="card">
+            <h3>📺 ① 获取视频信息</h3>
+            <label>AV号 / BV号 (自动转换)</label>
+            <input type="text" id="avInput" placeholder="例如: 170001 或 BV17x411w7Kc" value="170001">
+            <button id="fetchInfoBtn">📥 请求 /api/view</button>
+        </div>
+
+        <!-- 卡片2: 播放地址获取 -->
+        <div class="card">
+            <h3>🎬 ② 获取视频流地址</h3>
+            <label>CID (数字)</label>
+            <input type="text" id="cidInput" placeholder="从上方请求结果中复制 cid" value="">
+            <label>画质 qn</label>
+            <select id="qnSelect">
+                <option value="116">116 - 1080P+ (高码率)</option>
+                <option value="112">112 - 1080P</option>
+                <option value="80">80 - 720P</option>
+                <option value="64">64 - 480P</option>
+                <option value="32">32 - 360P</option>
+            </select>
+            <button id="getPlayUrlBtn">🎞️ 请求 /BPplayurl.php</button>
+        </div>
+
+        <!-- 卡片3: 批量aid信息 -->
+        <div class="card">
+            <h3>📚 ③ 批量查询 aid</h3>
+            <label>aid 列表 (英文逗号分隔)</label>
+            <input type="text" id="aidList" placeholder="例如: 170001, 354310, 95603178" value="170001,354310">
+            <button id="batchInfoBtn">📦 请求 /api/aidinfo</button>
+        </div>
+    </div>
+
+    <!-- 全局输出区域 -->
+    <div class="output-area">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span>📋 返回结果 (JSON) </span>
+            <button id="clearBtn" style="width: auto; padding: 5px 14px; margin:0; background: #3a3a4a;">清除</button>
+        </div>
+        <pre id="responsePre">✨ 点击上方任意按钮，结果会显示在这里～</pre>
+    </div>
+    <hr>
+    <div style="font-size: 0.7rem; text-align: center; color: #6a6a88">
+        ⏱️ 限频提醒: 5请求/分 (20 burst) | 番剧接口除外<br>
+        🔗 播放地址通常需要 Referer: https://www.bilibili.com ，可直接复制到支持自定义头的下载器
+    </div>
+</div>
+
+<script>
+    // ---------- 配置 ----------
+    const ACCESS_KEY = "78bd6ce6df11dc14c35b476bb9874031";
+    const API_BASE = "https://api.biliplus.com";
+
+    // 辅助函数: 获取请求URL并展示结果
+    async function callApi(url, description) {
+        const preElem = document.getElementById("responsePre");
+        preElem.textContent = `⏳ 请求中... ${description}\n${url}`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            preElem.textContent = JSON.stringify(data, null, 2);
+            // 如果返回视频信息并且有 cid，顺手把第一个cid填到cid输入框
+            if (url.includes("/api/view") && data && data.data && data.data.pages && data.data.pages.length > 0) {
+                const firstCid = data.data.pages[0].cid;
+                if (firstCid) {
+                    document.getElementById("cidInput").value = firstCid;
+                    preElem.textContent += `\n\n💡 提示: 已自动填充CID -> ${firstCid}，可直接点击「获取播放地址」`;
+                }
+            }
+        } catch (err) {
+            preElem.textContent = `❌ 请求失败: ${err.message}\n\nURL: ${url}\n💡 可能原因: 跨域被阻? 接口限频? 网络问题? 可以在控制台查看详情。`;
+            console.error(err);
+        }
+    }
+
+    // 简易BV转AV (bilibili BV -> aid 数值)
+    function bvToAv(bv) {
+        try {
+            // 非常简单的转换库：其实多数情况可以借助接口，但为了演示，利用内置算法快速转换
+            // 来源: 开源转换规则 (av<->BV) 标准算法
+            const table = 'fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF';
+            const tr = {};
+            for (let i = 0; i < 58; i++) tr[table[i]] = i;
+            const s = [11, 10, 3, 8, 4, 6];
+            const xor = 177451812;
+            const add = 8728348608;
+            if (!bv.match(/^BV1/)) return NaN;
+            let r = 0;
+            for (let i = 0; i < 6; i++) {
+                r += tr[bv[s[i]]] * Math.pow(58, i);
+            }
+            return (r - add) ^ xor;
+        } catch(e) {
+            return NaN;
+        }
+    }
+
+    // 处理输入框里的av/bv，返回纯aid数字
+    function getAidFromInput(inputVal) {
+        let raw = inputVal.trim();
+        if (raw.toUpperCase().startsWith('BV')) {
+            const aidNum = bvToAv(raw.toUpperCase());
+            if (!isNaN(aidNum) && aidNum > 0) return aidNum;
+            return raw;  // 转换失败保留原始字符串，后面接口会报错
+        }
+        // 如果是纯数字
+        let num = parseInt(raw, 10);
+        if (!isNaN(num)) return num;
+        return raw;
+    }
+
+    // 事件绑定
+    document.getElementById("fetchInfoBtn").addEventListener("click", () => {
+        let inputVal = document.getElementById("avInput").value;
+        let aid = getAidFromInput(inputVal);
+        if (isNaN(parseInt(aid))) {
+            document.getElementById("responsePre").textContent = `❌ 无法识别AV/BV: ${inputVal}`;
+            return;
+        }
+        const url = `${API_BASE}/api/view?id=${aid}&access_key=${ACCESS_KEY}`;
+        callApi(url, "获取视频信息");
+    });
+
+    document.getElementById("getPlayUrlBtn").addEventListener("click", () => {
+        let cid = document.getElementById("cidInput").value.trim();
+        if (!cid) {
+            document.getElementById("responsePre").textContent = "⚠️ 请先填写 CID (可从左侧视频信息结果中自动获取或手动填入)";
+            return;
+        }
+        let qn = document.getElementById("qnSelect").value;
+        // 用 BPplayurl.php 接口
+        const url = `${API_BASE}/BPplayurl.php?cid=${cid}&qn=${qn}&platform=flash&access_key=${ACCESS_KEY}`;
+        callApi(url, "获取播放地址");
+    });
+
+    document.getElementById("batchInfoBtn").addEventListener("click", () => {
+        let aidsRaw = document.getElementById("aidList").value;
+        if (!aidsRaw) {
+            document.getElementById("responsePre").textContent = "请输入aid列表";
+            return;
+        }
+        // 清理空格，只保留数字和英文逗号
+        let clean = aidsRaw.replace(/\s/g, '');
+        const url = `${API_BASE}/api/aidinfo?aid=${clean}&access_key=${ACCESS_KEY}`;
+        callApi(url, "批量查询aid信息");
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+        document.getElementById("responsePre").textContent = "🧹 已清除，可以继续测试～";
+    });
+</script>
+</body>
+</html>
