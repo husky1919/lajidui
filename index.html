@@ -2,29 +2,29 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>文件浏览器</title>
+    <title>文件浏览器 - 无跳转版</title>
 </head>
 <body>
     <p>说明：JS和WASM目录下的是MC移植网页版，biliplus开头的不用理</p>
     <div>
-        <button id="backBtn" style="display:none;" onclick="goBack()">⬅ 返回上级</button>
+        <button id="backBtn" style="display:none;">⬅ 返回上级</button>
         <span id="currentPath">当前位置：/</span>
     </div>
     <input type="text" id="filter" placeholder="筛选" onkeyup="filterList()">
     <div id="fileList">正在加载…</div>
 
     <script>
-        // 配置
+        // ---------- 配置 ----------
         const REPO_OWNER = "husky1919";
         const REPO_NAME = "husky1919.github.io";
         const BRANCH = "main";
 
-        // 全局数据
-        let allItems = [];        // 所有文件和目录的完整路径列表
-        let currentPath = "";     // 当前浏览的目录路径（相对于仓库根目录，空字符串表示根）
-        let currentEntries = [];   // 当前目录下的直接子项（文件夹+文件）
+        // ---------- 全局状态 ----------
+        let allItems = [];        // 所有文件/目录的原始数据
+        let currentPath = "";     // 当前浏览的相对路径，空为根
+        let currentEntries = [];   // 当前目录下的条目 { type, name, fullPath }
 
-        // 获取仓库所有文件/目录的原始数据（递归树）
+        // ---------- 获取仓库文件树 ----------
         async function fetchAllItems() {
             const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
             try {
@@ -35,66 +35,67 @@
                     const fileName = item.path.split('/').pop();
                     return item.path !== 'index.html' && !fileName.startsWith('biliplus');
                 });
-                // 开始浏览根目录
                 navigateTo("");
             } catch (err) {
                 document.getElementById('fileList').innerHTML = `加载失败：${err.message}`;
             }
         }
 
-        // 导航到指定目录（纯前端更新，不跳转页面）
+        // ---------- 导航核心：绝对不产生跳转 ----------
         function navigateTo(path) {
             currentPath = path;
-            // 更新界面上的路径显示
-            const pathDisplay = currentPath === "" ? "/" : "/" + currentPath + "/";
-            document.getElementById('currentPath').innerText = "当前位置：" + pathDisplay;
-            // 控制返回按钮的显示
-            document.getElementById('backBtn').style.display = currentPath === "" ? "none" : "inline-block";
+            // 更新界面路径显示
+            const displayPath = currentPath === "" ? "/" : "/" + currentPath + "/";
+            document.getElementById('currentPath').innerText = "当前位置：" + displayPath;
+            // 返回按钮显示逻辑
+            const backBtn = document.getElementById('backBtn');
+            backBtn.style.display = currentPath === "" ? "none" : "inline-block";
 
-            // 找出当前目录下的直接子项（文件夹和文件）
-            const entries = new Map();  // 用 Map 避免重复添加相同名称的文件夹
+            // 解析当前目录下的直接子项
+            const entriesMap = new Map();  // key: 名称, value: 条目对象
 
             for (const item of allItems) {
                 const fullPath = item.path;
-                // 如果不是在当前目录下，跳过
+                // 判断是否在当前目录下
                 if (currentPath !== "") {
                     if (!fullPath.startsWith(currentPath + "/")) continue;
                 }
 
-                // 获取相对路径（相对于当前目录）
-                let relativePath;
-                if (currentPath === "") {
-                    relativePath = fullPath;
-                } else {
-                    relativePath = fullPath.substring(currentPath.length + 1);
-                }
+                // 相对路径（相对于当前目录）
+                let relative = currentPath === "" ? fullPath : fullPath.substring(currentPath.length + 1);
 
-                // 如果还有斜杠，说明是子目录中的内容，只取第一段作为目录名
-                if (relativePath.includes("/")) {
-                    const dirName = relativePath.split("/")[0];
-                    if (!entries.has(dirName)) {
-                        entries.set(dirName, { type: "dir", name: dirName, fullPath: currentPath === "" ? dirName : currentPath + "/" + dirName });
+                // 如果还包含 '/'，说明是更深层的目录，只取第一段作为目录名
+                if (relative.includes("/")) {
+                    const dirName = relative.split("/")[0];
+                    if (!entriesMap.has(dirName)) {
+                        entriesMap.set(dirName, {
+                            type: "dir",
+                            name: dirName,
+                            fullPath: currentPath === "" ? dirName : currentPath + "/" + dirName
+                        });
                     }
                 } else {
-                    // 当前目录下的文件
-                    entries.set(relativePath, { type: "file", name: relativePath, fullPath: fullPath });
+                    // 文件
+                    entriesMap.set(relative, {
+                        type: "file",
+                        name: relative,
+                        fullPath: fullPath
+                    });
                 }
             }
 
-            // 转为数组并排序：文件夹在前，文件在后，按名称排序
-            let entryList = Array.from(entries.values());
-            entryList.sort((a, b) => {
-                if (a.type !== b.type) {
-                    return a.type === "dir" ? -1 : 1;
-                }
+            // 排序：文件夹在前，文件在后，按名字排序
+            let entries = Array.from(entriesMap.values());
+            entries.sort((a, b) => {
+                if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
 
-            currentEntries = entryList;
+            currentEntries = entries;
             renderFileList();
         }
 
-        // 渲染当前目录下的文件和文件夹
+        // ---------- 渲染当前视图 ----------
         function renderFileList() {
             const container = document.getElementById('fileList');
             if (currentEntries.length === 0) {
@@ -102,24 +103,53 @@
                 return;
             }
 
-            let html = "";
+            // 构建 DOM，文件夹使用 data-* 属性 + 监听器，而不是 onclick 字符串
+            container.innerHTML = "";
             for (const entry of currentEntries) {
+                const div = document.createElement("div");
                 if (entry.type === "dir") {
-                    // 文件夹：使用 span 绑定点击事件，绝对不产生跳转
-                    html += `<div><span style="cursor:pointer;color:#0000EE;text-decoration:underline;" onclick="navigateTo('${escapePath(entry.fullPath)}')">📁 ${entry.name}</span></div>`;
+                    const span = document.createElement("span");
+                    span.textContent = "📁 " + entry.name;
+                    span.style.cursor = "pointer";
+                    span.style.color = "#0000EE";
+                    span.style.textDecoration = "underline";
+                    span.setAttribute("data-path", entry.fullPath);
+                    span.classList.add("folder-link");
+                    div.appendChild(span);
                 } else {
-                    // 文件：用正常的超链接，在新标签页打开（符合预期）
-                    html += `<div><a href="${entry.fullPath}" target="_blank">📄 ${entry.name}</a></div>`;
+                    const a = document.createElement("a");
+                    a.textContent = "📄 " + entry.name;
+                    a.href = entry.fullPath;
+                    a.target = "_blank";
+                    div.appendChild(a);
                 }
+                container.appendChild(div);
             }
-            container.innerHTML = html;
+
+            // 重新绑定文件夹点击事件（确保无跳转）
+            const folders = document.querySelectorAll(".folder-link");
+            folders.forEach(folder => {
+                folder.removeEventListener("click", folderClickHandler);
+                folder.addEventListener("click", folderClickHandler);
+            });
 
             // 如果存在筛选关键词，重新应用筛选
             const keyword = document.getElementById('filter').value.trim().toLowerCase();
             if (keyword) applyFilter(keyword);
         }
 
-        // 返回上级目录
+        // 文件夹点击处理函数（核心：绝对不跳转）
+        function folderClickHandler(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const path = this.getAttribute("data-path");
+            if (path) {
+                navigateTo(path);
+            }
+            return false;
+        }
+
+        // 返回上级
         function goBack() {
             if (currentPath === "") return;
             const lastSlash = currentPath.lastIndexOf("/");
@@ -127,34 +157,30 @@
             navigateTo(parentPath);
         }
 
-        // 辅助函数：转义路径中的单引号，避免 onclick 语法错误
-        function escapePath(path) {
-            return path.replace(/'/g, "\\'");
-        }
-
-        // 筛选功能（基于当前渲染的 DOM 元素）
+        // 筛选功能
         function filterList() {
             const keyword = document.getElementById('filter').value.trim().toLowerCase();
             applyFilter(keyword);
         }
 
         function applyFilter(keyword) {
-            const items = document.querySelectorAll('#fileList > div');
+            const container = document.getElementById('fileList');
+            const children = container.children;
             if (keyword === "") {
-                for (let i = 0; i < items.length; i++) {
-                    items[i].style.display = "";
+                for (let i = 0; i < children.length; i++) {
+                    children[i].style.display = "";
                 }
                 return;
             }
-            for (let i = 0; i < items.length; i++) {
-                const text = items[i].innerText.toLowerCase();
-                if (text.includes(keyword)) {
-                    items[i].style.display = "";
-                } else {
-                    items[i].style.display = "none";
-                }
+            for (let i = 0; i < children.length; i++) {
+                const text = children[i].innerText.toLowerCase();
+                children[i].style.display = text.includes(keyword) ? "" : "none";
             }
         }
+
+        // ---------- 事件绑定 ----------
+        document.getElementById("backBtn").addEventListener("click", goBack);
+        // 注意：filter 的 onkeyup 已经写在 HTML 里，也可以保留
 
         // 启动
         fetchAllItems();
