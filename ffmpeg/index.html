@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="coi-serviceworker.js"></script>
+    <title>FFmpeg 视频转换器</title>
+</head>
+<body>
+    <h1>FFmpeg.wasm 视频转换工具</h1>
+    <p>当前状态: <span id="status">等待操作</span></p>
+    
+    <input type="file" id="uploader" accept="video/*">
+    <br><br>
+    <button id="processBtn">开始转换 (AVI 转 MP4)</button>
+
+    <script type="module">
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+        import { fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
+        const ffmpeg = new FFmpeg();
+        const statusSpan = document.getElementById('status');
+        
+        document.getElementById('processBtn').onclick = async () => {
+            const fileInput = document.getElementById('uploader');
+            if (!fileInput.files.length) {
+                statusSpan.textContent = '错误: 请先选择视频文件';
+                return;
+            }
+
+            statusSpan.textContent = '正在加载 FFmpeg 核心 (首次约30MB)...';
+            
+            try {
+                await ffmpeg.load({
+                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+                    wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
+                });
+                statusSpan.textContent = '加载完成，开始处理文件...';
+            } catch(e) {
+                console.warn(e);
+                await ffmpeg.load({
+                    coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+                    wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
+                });
+                statusSpan.textContent = '加载完成，开始处理文件...';
+            }
+
+            const file = fileInput.files[0];
+            statusSpan.textContent = `正在写入文件: ${file.name}`;
+            await ffmpeg.writeFile('input.avi', await fetchFile(file));
+
+            statusSpan.textContent = '正在转换 (AVI 转 MP4)...';
+            await ffmpeg.exec(['-i', 'input.avi', 'output.mp4']);
+
+            statusSpan.textContent = '转换完成，准备下载...';
+            const data = await ffmpeg.readFile('output.mp4');
+            const blob = new Blob([data.buffer], { type: 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'output.mp4';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            statusSpan.textContent = '下载已开始！';
+        };
+    </script>
+</body>
+</html>
