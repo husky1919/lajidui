@@ -15,7 +15,14 @@
             const REPO_OWNER = 'husky1919';
             const REPO_NAME = 'husky1919.github.io';
             const BRANCH = 'main';
-            const RAW_BASE = `https://githubraw.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/`;
+
+            // HTML继续走githubraw
+            const HTML_BASE =
+                `https://githubraw.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/`;
+
+            // 其它文件走GitHub Raw
+            const RAW_BASE =
+                `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/`;
 
             let allItems = [];
             let currentPath = '';
@@ -28,110 +35,253 @@
 
             async function loadTree() {
                 fileListDiv.textContent = '加载中…';
+
                 try {
-                    const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`);
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const res = await fetch(
+                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`
+                    );
+
+                    if (!res.ok)
+                        throw new Error('HTTP ' + res.status);
+
                     const data = await res.json();
+
                     allItems = data.tree.filter(item => {
                         const name = item.path.split('/').pop();
-                        return item.path !== 'index.html' && !name.startsWith('biliplus');
+
+                        return (
+                            item.path !== 'index.html' &&
+                            !name.startsWith('biliplus')
+                        );
                     });
+
                     navigateTo('');
                 } catch (err) {
-                    fileListDiv.textContent = '加载失败：' + err.message;
+                    fileListDiv.textContent =
+                        '加载失败：' + err.message;
                 }
             }
 
             function navigateTo(path) {
                 currentPath = path;
-                pathSpan.textContent = path === '' ? '/' : '/' + path + '/';
-                backBtn.style.display = path === '' ? 'none' : 'inline-block';
+
+                pathSpan.textContent =
+                    path === '' ? '/' : '/' + path + '/';
+
+                backBtn.style.display =
+                    path === '' ? 'none' : 'inline-block';
 
                 const map = new Map();
+
                 for (const item of allItems) {
                     const full = item.path;
-                    if (path !== '' && !full.startsWith(path + '/')) continue;
-                    let relative = path === '' ? full : full.substring(path.length + 1);
+
+                    if (
+                        path !== '' &&
+                        !full.startsWith(path + '/')
+                    ) {
+                        continue;
+                    }
+
+                    let relative =
+                        path === ''
+                            ? full
+                            : full.substring(path.length + 1);
 
                     if (relative.includes('/')) {
-                        const dirName = relative.split('/')[0];
-                        // 文件夹：直接设置（覆盖可能已有的同名文件条目）
+                        const dirName =
+                            relative.split('/')[0];
+
                         map.set(dirName, {
                             type: 'dir',
                             name: dirName,
-                            fullPath: path === '' ? dirName : path + '/' + dirName
+                            fullPath:
+                                path === ''
+                                    ? dirName
+                                    : path + '/' + dirName
                         });
                     } else {
-                        // 文件：只有当前没有同名文件夹时才添加
                         const existing = map.get(relative);
-                        if (!existing || existing.type !== 'dir') {
+
+                        if (
+                            !existing ||
+                            existing.type !== 'dir'
+                        ) {
+                            const ext =
+                                relative
+                                    .split('.')
+                                    .pop()
+                                    .toLowerCase();
+
+                            const isHtml =
+                                ext === 'html' ||
+                                ext === 'htm';
+
+                            const isVideo = [
+                                'mp4',
+                                'webm',
+                                'mkv',
+                                'mov',
+                                'avi',
+                                'm4v'
+                            ].includes(ext);
+
                             map.set(relative, {
                                 type: 'file',
                                 name: relative,
                                 fullPath: full,
-                                rawUrl: RAW_BASE + full.split('/').map(encodeURIComponent).join('/')
+                                isVideo,
+
+                                rawUrl: isHtml
+                                    ? HTML_BASE +
+                                      full
+                                          .split('/')
+                                          .map(
+                                              encodeURIComponent
+                                          )
+                                          .join('/')
+                                    : RAW_BASE +
+                                      full
+                                          .split('/')
+                                          .map(
+                                              encodeURIComponent
+                                          )
+                                          .join('/')
                             });
                         }
                     }
                 }
 
-                currentEntries = Array.from(map.values()).sort((a, b) => {
-                    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
-                    return a.name.localeCompare(b.name);
+                currentEntries = Array.from(
+                    map.values()
+                ).sort((a, b) => {
+                    if (a.type !== b.type) {
+                        return a.type === 'dir'
+                            ? -1
+                            : 1;
+                    }
+
+                    return a.name.localeCompare(
+                        b.name
+                    );
                 });
+
                 render();
             }
 
             function render() {
                 if (currentEntries.length === 0) {
-                    fileListDiv.textContent = '此文件夹为空';
+                    fileListDiv.textContent =
+                        '此文件夹为空';
                     return;
                 }
+
                 fileListDiv.innerHTML = '';
+
                 for (const entry of currentEntries) {
-                    const div = document.createElement('div');
+                    const div =
+                        document.createElement('div');
+
                     if (entry.type === 'dir') {
                         div.style.cursor = 'pointer';
                         div.style.color = 'blue';
-                        div.style.textDecoration = 'underline';
+                        div.style.textDecoration =
+                            'underline';
+
                         div.textContent = entry.name;
-                        div.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            navigateTo(entry.fullPath);
-                        });
+
+                        div.addEventListener(
+                            'click',
+                            function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                navigateTo(
+                                    entry.fullPath
+                                );
+                            }
+                        );
                     } else {
-                        const a = document.createElement('a');
+                        const a =
+                            document.createElement(
+                                'a'
+                            );
+
                         a.href = entry.rawUrl;
-                        a.target = '_blank';
-                        a.rel = 'noopener noreferrer';
+
+                        if (entry.isVideo) {
+                            a.download = entry.name;
+                        } else {
+                            a.target = '_blank';
+                            a.rel =
+                                'noopener noreferrer';
+                        }
+
                         a.textContent = entry.name;
+
                         div.appendChild(a);
                     }
+
                     fileListDiv.appendChild(div);
                 }
+
                 applyFilter();
             }
 
             function applyFilter() {
-                const keyword = filterInput.value.trim().toLowerCase();
-                Array.from(fileListDiv.children).forEach(div => {
-                    const text = (div.textContent || '').toLowerCase();
-                    div.style.display = (keyword === '' || text.includes(keyword)) ? '' : 'none';
+                const keyword =
+                    filterInput.value
+                        .trim()
+                        .toLowerCase();
+
+                Array.from(
+                    fileListDiv.children
+                ).forEach(div => {
+                    const text = (
+                        div.textContent || ''
+                    ).toLowerCase();
+
+                    div.style.display =
+                        keyword === '' ||
+                        text.includes(keyword)
+                            ? ''
+                            : 'none';
                 });
             }
 
-            backBtn.addEventListener('click', () => {
-                if (currentPath === '') return;
-                const lastSlash = currentPath.lastIndexOf('/');
-                navigateTo(lastSlash === -1 ? '' : currentPath.substring(0, lastSlash));
-            });
+            backBtn.addEventListener(
+                'click',
+                () => {
+                    if (currentPath === '')
+                        return;
+
+                    const lastSlash =
+                        currentPath.lastIndexOf('/');
+
+                    navigateTo(
+                        lastSlash === -1
+                            ? ''
+                            : currentPath.substring(
+                                  0,
+                                  lastSlash
+                              )
+                    );
+                }
+            );
 
             let timer;
-            filterInput.addEventListener('input', () => {
-                clearTimeout(timer);
-                timer = setTimeout(applyFilter, 150);
-            });
+
+            filterInput.addEventListener(
+                'input',
+                () => {
+                    clearTimeout(timer);
+
+                    timer = setTimeout(
+                        applyFilter,
+                        150
+                    );
+                }
+            );
 
             loadTree();
         })();
