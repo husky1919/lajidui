@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>husky1919 Pages 列表</title>
+    <title>husky1919 · GitHub 仓库列表</title>
     <style>
         * {
             box-sizing: border-box;
@@ -129,19 +129,9 @@
             background: #f6f8fa;
             padding: 2px 8px;
             border-radius: 20px;
-            max-width: 320px;
+            max-width: 360px;
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .pages-badge {
-            background: #ddf4ff;
-            color: #0969da;
-            font-size: 0.7rem;
-            font-weight: 500;
-            padding: 3px 8px;
-            border-radius: 30px;
-            letter-spacing: 0.3px;
             white-space: nowrap;
         }
         .loading-state, .empty-state, .error-state {
@@ -188,9 +178,9 @@
 </head>
 <body>
 <div class="container">
-    <h1>husky1919 · GitHub Pages 仓库</h1>
+    <h1>husky1919 · 全部仓库</h1>
     <div class="desc">
-        已启用 GitHub Pages 的仓库列表
+        点击任意仓库，跳转至 https://husky1919.github.io/仓库名/
     </div>
     <div class="toolbar">
         <div class="filter-wrapper">
@@ -198,17 +188,17 @@
             <input type="text" id="filter" placeholder="仓库名称" autocomplete="off">
         </div>
         <div class="stats-badge" id="statsLabel">
-            等待扫描
+            等待加载
         </div>
         <button class="refresh-btn" id="refreshBtn">刷新</button>
     </div>
     <div id="repoList" class="repo-grid">
         <div class="loading-state">
-            正在获取仓库列表并检测 Pages 状态
+            正在获取仓库列表...
         </div>
     </div>
     <footer>
-        仅展示已成功发布 GitHub Pages 的仓库
+        共展示所有公开仓库，点击后跳转至 husky1919.github.io/仓库名/
     </footer>
 </div>
 
@@ -222,27 +212,27 @@
         const statsLabel = document.getElementById('statsLabel');
         const refreshBtn = document.getElementById('refreshBtn');
         
-        let allPagesRepos = [];
+        let allRepos = [];
         let isLoading = false;
         
-        function setLoading(loadingMsg = '正在扫描仓库并检测 Pages 状态...') {
+        function setLoading(loadingMsg = '正在获取仓库列表...') {
             if (isLoading) return;
             isLoading = true;
             repoContainer.innerHTML = `<div class="loading-state">${loadingMsg}</div>`;
-            if (statsLabel) statsLabel.textContent = '检测中';
+            if (statsLabel) statsLabel.textContent = '加载中';
         }
         
         function setError(errMsg) {
             repoContainer.innerHTML = `<div class="error-state">加载失败: ${errMsg}<br><br><button class="refresh-btn" id="retryBtn" style="margin-top:8px;">重试</button></div>`;
             const retryBtn = document.getElementById('retryBtn');
-            if (retryBtn) retryBtn.addEventListener('click', () => loadRepositoriesAndPages());
+            if (retryBtn) retryBtn.addEventListener('click', () => loadAllRepositories());
             statsLabel.textContent = '请求失败';
             isLoading = false;
         }
         
         function setEmpty() {
-            repoContainer.innerHTML = `<div class="empty-state">未找到任何启用 GitHub Pages 的公开仓库</div>`;
-            statsLabel.textContent = '0 个 Pages 仓库';
+            repoContainer.innerHTML = `<div class="empty-state">未找到任何公开仓库</div>`;
+            statsLabel.textContent = '0 个仓库';
             isLoading = false;
         }
         
@@ -264,20 +254,20 @@
         }
         
         function renderRepoList(filterKeyword = '') {
-            if (!allPagesRepos.length) {
+            if (!allRepos.length) {
                 if (!isLoading) setEmpty();
                 return;
             }
             
-            let filtered = [...allPagesRepos];
+            let filtered = [...allRepos];
             const keyword = filterKeyword.trim().toLowerCase();
             if (keyword !== '') {
                 filtered = filtered.filter(repo => repo.name.toLowerCase().includes(keyword));
             }
             
             if (filtered.length === 0) {
-                repoContainer.innerHTML = `<div class="empty-state">没有匹配的 Pages 仓库</div>`;
-                statsLabel.textContent = `${allPagesRepos.length} 个 Pages 仓库 · 无匹配`;
+                repoContainer.innerHTML = `<div class="empty-state">没有匹配的仓库</div>`;
+                statsLabel.textContent = `${allRepos.length} 个仓库 · 无匹配`;
                 return;
             }
             
@@ -311,15 +301,10 @@
                 leftDiv.appendChild(nameSpan);
                 leftDiv.appendChild(urlSpan);
                 
-                const badgeSpan = document.createElement('span');
-                badgeSpan.className = 'pages-badge';
-                badgeSpan.textContent = 'Pages';
-                
                 const rightWrapper = document.createElement('div');
                 rightWrapper.style.display = 'flex';
                 rightWrapper.style.alignItems = 'center';
                 rightWrapper.style.gap = '12px';
-                rightWrapper.appendChild(badgeSpan);
                 
                 link.appendChild(leftDiv);
                 link.appendChild(rightWrapper);
@@ -329,14 +314,14 @@
             
             repoContainer.innerHTML = '';
             repoContainer.appendChild(fragment);
-            statsLabel.textContent = `${filtered.length} / ${allPagesRepos.length} 个 Pages 仓库`;
+            statsLabel.textContent = `${filtered.length} / ${allRepos.length} 个仓库`;
             isLoading = false;
         }
         
-        async function loadRepositoriesAndPages() {
-            allPagesRepos = [];
+        async function loadAllRepositories() {
+            allRepos = [];
             isLoading = true;
-            setLoading('正在获取仓库并检测 Pages 配置...');
+            setLoading('正在获取仓库列表...');
             
             try {
                 const reposResponse = await fetch(GITHUB_API_REPOS, {
@@ -361,62 +346,21 @@
                 }
                 
                 const publicRepos = repos.filter(repo => !repo.private);
-                const totalRepos = publicRepos.length;
-                statsLabel.textContent = `检测中 (0/${totalRepos})`;
                 
-                repoContainer.innerHTML = `<div class="loading-state">正在检测 ${totalRepos} 个仓库的 Pages 状态...</div>`;
-                
-                const BATCH_SIZE = 5;
-                const results = [];
-                for (let i = 0; i < publicRepos.length; i += BATCH_SIZE) {
-                    const batch = publicRepos.slice(i, i + BATCH_SIZE);
-                    const batchPromises = batch.map(async (repo) => {
-                        const pagesApiUrl = `https://api.github.com/repos/${USERNAME}/${repo.name}/pages`;
-                        try {
-                            const pagesRes = await fetch(pagesApiUrl, {
-                                headers: { 'Accept': 'application/vnd.github.v3+json' }
-                            });
-                            if (pagesRes.status === 200) {
-                                const pagesData = await pagesRes.json();
-                                if (pagesData && (pagesData.html_url || pagesData.url)) {
-                                    return {
-                                        name: repo.name,
-                                        enabled: true
-                                    };
-                                } else {
-                                    return { name: repo.name, enabled: true };
-                                }
-                            } else {
-                                return { name: repo.name, enabled: false };
-                            }
-                        } catch (err) {
-                            console.warn(`检测仓库 ${repo.name} Pages失败`, err);
-                            return { name: repo.name, enabled: false };
-                        }
-                    });
-                    const batchResults = await Promise.all(batchPromises);
-                    results.push(...batchResults);
-                    const processed = Math.min(i + BATCH_SIZE, totalRepos);
-                    statsLabel.textContent = `检测中 (${processed}/${totalRepos})`;
-                }
-                
-                const enabledRepos = [];
-                for (const res of results) {
-                    if (res && res.enabled === true) {
-                        enabledRepos.push({
-                            name: res.name
-                        });
-                    }
-                }
-                
-                enabledRepos.sort((a,b) => a.name.localeCompare(b.name));
-                allPagesRepos = enabledRepos;
-                
-                if (allPagesRepos.length === 0) {
+                if (publicRepos.length === 0) {
                     setEmpty();
                     isLoading = false;
                     return;
                 }
+                
+                publicRepos.sort((a, b) => a.name.localeCompare(b.name));
+                
+                allRepos = publicRepos.map(repo => ({
+                    name: repo.name,
+                    fullName: repo.full_name,
+                    description: repo.description || '',
+                    updatedAt: repo.updated_at
+                }));
                 
                 renderRepoList(filterInput.value);
                 isLoading = false;
@@ -448,13 +392,13 @@
         
         function handleRefresh() {
             if (isLoading) return;
-            loadRepositoriesAndPages().catch(() => {});
+            loadAllRepositories().catch(() => {});
         }
         
         filterInput.addEventListener('input', onFilterInput);
         refreshBtn.addEventListener('click', handleRefresh);
         
-        loadRepositoriesAndPages();
+        loadAllRepositories();
     })();
 </script>
 </body>
